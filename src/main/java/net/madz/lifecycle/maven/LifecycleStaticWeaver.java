@@ -37,7 +37,7 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 
 	public void execute() throws MojoExecutionException, MojoFailureException {
 
-		getLog().error(new File("./").getAbsolutePath());
+		getLog().info(new File("./").getAbsolutePath());
 
 		final String separator;
 		if (File.separatorChar == '\\') {
@@ -46,8 +46,8 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 			separator = File.separator;
 		}
 		final String targetClassesFolder = buildDir + separator + "classes";
-		getLog().error(targetClassesFolder);
-		getLog().error(lifecyclePath);
+		getLog().info(targetClassesFolder);
+		getLog().info(lifecyclePath);
 		final StringBuffer classpath = new StringBuffer(".:");
 		for (String element : runtimeClasspathElements) {
 			classpath.append(element).append(":");
@@ -56,12 +56,12 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 
 		final File lifecycleJar = new File(lifecyclePath);
 		classpath.append(lifecycleJar);
-		getLog().error(classpath);
+		getLog().info(classpath);
 
 		String cmd = "java -cp " + classpath + " -javaagent:" + lifecyclePath
 				+ " -Dnet.madz.bcel.save.original=true" + " "
 				+ "net.madz.lifecycle.StaticWeaver " + targetClassesFolder;
-		getLog().error(cmd);
+		getLog().info(cmd);
 		BufferedReader reader = null;
 		try {
 			Process exec = Runtime.getRuntime().exec(cmd);
@@ -69,7 +69,7 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 			reader = new BufferedReader(new InputStreamReader(errorStream));
 			String line = null;
 			while (null != (line = reader.readLine())) {
-				getLog().error(line);
+				getLog().info(line);
 			}
 			if (exec.exitValue() > 0) {
 				throw new IllegalStateException("Lifecycle Cannot Compile.");
