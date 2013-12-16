@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.List;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -12,7 +13,9 @@ import org.apache.maven.plugin.MojoFailureException;
 
 /**
  * @goal StaticWeave
- * @phase compile
+ * @phase process-classes
+ * @configurator include-project-dependencies
+ * @requiresDependencyResolution compile+runtime
  * @requiresProject false
  */
 public class LifecycleStaticWeaver extends AbstractMojo {
@@ -26,6 +29,11 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 	 * @parameter expression="${lifecycle.path}"
 	 */
 	private String lifecyclePath;
+
+	/**
+	 * @parameter expression="${project.runtimeClasspathElements}"
+	 */
+	private List<String> runtimeClasspathElements;
 
 	public void execute() throws MojoExecutionException, MojoFailureException {
 
@@ -41,6 +49,9 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 		getLog().error(targetClassesFolder);
 		getLog().error(lifecyclePath);
 		final StringBuffer classpath = new StringBuffer(".:");
+		for (String element : runtimeClasspathElements) {
+			classpath.append(element).append(":");
+		}
 		classpath.append(targetClassesFolder).append(":");
 
 		final File lifecycleJar = new File(lifecyclePath);
