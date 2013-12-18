@@ -1,4 +1,4 @@
-package net.madz.lifecycle.maven;
+package net.imadz.lifecycle.maven;
 
 import java.io.File;
 import java.net.MalformedURLException;

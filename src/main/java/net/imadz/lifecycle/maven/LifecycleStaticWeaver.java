@@ -1,4 +1,4 @@
-package net.madz.lifecycle.maven;
+package net.imadz.lifecycle.maven;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -59,8 +59,8 @@ public class LifecycleStaticWeaver extends AbstractMojo {
 		getLog().info(classpath);
 
 		String cmd = "java -cp " + classpath + " -javaagent:" + lifecyclePath
-				+ " -Dnet.madz.bcel.save.original=true" + " "
-				+ "net.madz.lifecycle.StaticWeaver " + targetClassesFolder;
+				+ " -Dnet.imadz.bcel.save.original=true" + " "
+				+ "net.imadz.lifecycle.StaticWeaver " + targetClassesFolder;
 		getLog().info(cmd);
 		BufferedReader reader = null;
 		try {
