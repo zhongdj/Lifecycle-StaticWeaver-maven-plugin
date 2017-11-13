@@ -34,15 +34,21 @@
  */
 package net.imadz.lifecycle.maven;
 
+import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuilderConfiguration;
+import org.codehaus.plexus.util.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.util.List;
 
 /**
@@ -54,81 +60,155 @@ import java.util.List;
  */
 public class LifecycleStaticWeaver extends AbstractMojo {
 
-    /**
-     * @parameter expression="${project.build.directory}"
-     */
-    private String buildDir;
-    /**
-     * @parameter expression="${lifecycle.path}"
-     */
-    private String lifecyclePath;
-    /**
-     * @parameter expression="${project.runtimeClasspathElements}"
-     */
-    private List<String> runtimeClasspathElements;
+  /**
+   * @parameter expression="${project.build.directory}"
+   */
+  private String buildDir;
 
-    public void execute() throws MojoExecutionException, MojoFailureException {
-        getLog().info(new File("./").getAbsolutePath());
-        final String separator;
-        if ( File.separatorChar == '\\' ) {
-            separator = "\\";
-        } else {
-            separator = File.separator;
+  /**
+   * @parameter expression="${lifecycle.path}"
+   */
+  private String lifecyclePath;
+
+  private final MavenProject mavenProject() {
+    return ((MavenProject) this.getPluginContext().get("project"));
+  }
+
+
+  private final String baseDir() {
+    try {
+      return projectBuilderConfiguration().getLocalRepository().getBasedir();
+    } catch (Exception ex) {
+      return defaultBaseDir();
+    }
+  }
+
+  private String defaultBaseDir() {
+    final StringBuilder sb = new StringBuilder();
+    return sb.append(System.getProperty("user.home")).append(File.separator)
+        .append(".m2").append(File.separator)
+        .append("repository").append(File.separator)
+        .toString();
+  }
+
+  private DefaultProjectBuildingRequest projectBuilderConfiguration() {
+    Field configuration = null;
+    try {
+      configuration = MavenProject.class.getDeclaredField("projectBuilderConfiguration");
+      configuration.setAccessible(true);
+      return (DefaultProjectBuildingRequest) configuration.get(mavenProject());
+    } catch (Throwable t) {
+      throw new IllegalStateException("Cannot access Configuration");
+    } finally {
+      if (null != configuration) {
+        configuration.setAccessible(false);
+      }
+    }
+  }
+
+  private final String lifecycleArtifactRelativePath(final String lifecycleVersion) {
+    final StringBuilder sb = new StringBuilder();
+    return sb.append(File.separator)
+        .append("net").append(File.separator)
+        .append("imadz").append(File.separator)
+        .append("Lifecycle").append(File.separator)
+        .append(lifecycleVersion).append(File.separator)
+        .append("Lifecycle-").append(lifecycleVersion).append(".jar")
+        .toString();
+  }
+
+  private final String lifecycleArtifactPath(final String lifecycleVersion) {
+    return baseDir() + lifecycleArtifactRelativePath(lifecycleVersion);
+  }
+
+  private String lifecycleVersion() {
+    final Object[] artifacts =  mavenProject().getDependencyArtifacts().toArray();
+    for (Object artifact : artifacts) {
+      if (artifact instanceof DefaultArtifact) {
+        DefaultArtifact theArtifact = (DefaultArtifact) artifact;
+        if ("net.imadz".equals(theArtifact.getGroupId()) && "Lifecycle".equals(theArtifact.getArtifactId())) {
+          return theArtifact.getVersion();
         }
-        final String targetClassesFolder = buildDir + separator + "classes";
-        getLog().info(targetClassesFolder);
-        getLog().info(lifecyclePath);
-        final StringBuffer classpath = new StringBuffer(".:");
-        for ( String element : runtimeClasspathElements ) {
-            classpath.append(element).append(":");
-        }
-        classpath.append(targetClassesFolder).append(":");
-        final File lifecycleJar = new File(lifecyclePath);
-        classpath.append(lifecycleJar);
-        getLog().info(classpath);
-        String cmd = "java -cp " + classpath + " -javaagent:" + lifecyclePath + " -Dnet.imadz.bcel.save.original=true" + " "
-            + "net.imadz.lifecycle.StaticWeaver " + targetClassesFolder;
-        getLog().info(cmd);
-        BufferedReader reader = null;
-        Process exec = null;
+      }
+    }
+    throw new IllegalStateException("Cannot find net.imadz.Lifecycle from dependencies.");
+  }
+
+  /**
+   * @parameter expression="${project.runtimeClasspathElements}"
+   */
+  private List<String> runtimeClasspathElements;
+
+  public void execute() throws MojoExecutionException, MojoFailureException {
+    getLog().info(new File("./").getAbsolutePath());
+    final String separator;
+    if (File.separatorChar == '\\') {
+      separator = "\\";
+    } else {
+      separator = File.separator;
+    }
+    final String targetClassesFolder = buildDir + separator + "classes";
+    getLog().info(targetClassesFolder);
+    getLog().info(getLifecyclePath());
+    final StringBuffer classpath = new StringBuffer(".:");
+    for (String element : runtimeClasspathElements) {
+      classpath.append(element).append(":");
+    }
+    classpath.append(targetClassesFolder).append(":");
+    final File lifecycleJar = new File(getLifecyclePath());
+    classpath.append(lifecycleJar);
+    getLog().info(classpath);
+    String cmd = "java -cp " + classpath + " -javaagent:" + getLifecyclePath() + " -Dnet.imadz.bcel.save.original=true" + " "
+        + "net.imadz.lifecycle.StaticWeaver " + targetClassesFolder;
+    getLog().info(cmd);
+    BufferedReader reader = null;
+    Process exec = null;
+    try {
+      exec = Runtime.getRuntime().exec(cmd);
+      InputStream errorStream = exec.getErrorStream();
+      reader = new BufferedReader(new InputStreamReader(errorStream));
+      String line = null;
+      while (null != (line = reader.readLine())) {
+        getLog().info(line);
+      }
+      while (isAlive(exec)) {
+        Thread.sleep(500);
+      }
+      if (exec.exitValue() > 0) {
+        throw new IllegalStateException("Lifecycle Cannot Compile.");
+      }
+    } catch (IOException e) {
+      getLog().error(e);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    } finally {
+      if (null != reader) {
         try {
-            exec = Runtime.getRuntime().exec(cmd);
-            InputStream errorStream = exec.getErrorStream();
-            reader = new BufferedReader(new InputStreamReader(errorStream));
-            String line = null;
-            while ( null != ( line = reader.readLine() ) ) {
-                getLog().info(line);
-            }
-            while ( isAlive(exec) ) {
-                Thread.sleep(500);
-            }
-            if (  exec.exitValue() > 0 ) {
-                throw new IllegalStateException("Lifecycle Cannot Compile.");
-            }
-        } catch ( IOException e ) {
-            getLog().error(e);
-        } catch ( InterruptedException e ) {
-            e.printStackTrace();
-        } finally {
-            if ( null != reader ) {
-                try {
-                    reader.close();
-                } catch ( IOException e ) {
-                }
-            }
-            if ( null != exec ) {
-                exec.destroy();
-            }
+          reader.close();
+        } catch (IOException e) {
         }
+      }
+      if (null != exec) {
+        exec.destroy();
+      }
+    }
+  }
+
+  private Boolean isAlive(Process exec) {
+    try {
+      exec.exitValue();
+      return false;
+    } catch (Throwable t) {
+      return true;
     }
 
-    private Boolean isAlive(Process exec) {
-        try {
-             exec.exitValue();
-            return false;
-        } catch (Throwable t) {
-            return true;
-        }
+  }
 
+  private String getLifecyclePath() {
+    if (StringUtils.isNotEmpty(this.lifecyclePath)) {
+      return lifecyclePath;
+    } else {
+      return lifecycleArtifactPath(lifecycleVersion());
     }
+  }
 }
