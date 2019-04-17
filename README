@@ -1,47 +1,46 @@
+lifecycle has upgrade to 0.9.13 to support Spring compatibility, Please follow the follwing maven configuration.
 
-	<properties>
-		<lifecycle.version>0.0.1-SNAPSHOT</lifecycle.version>
-	</properties>
-	
-	<dependencies>
-		<dependency>
-			<groupId>net.madz</groupId>
-			<artifactId>Lifecycle</artifactId>
-			<version>${lifecycle.version}</version>
-		</dependency>
-	</dependencies>
-	
-	<build>
-	
-		<plugins>
-		
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.1</version>
-				<configuration>
-					<source>1.7</source>
-					<target>1.7</target>
-				</configuration>
-			</plugin>
-		
-			<plugin>
-				<groupId>net.madz</groupId>
-				<artifactId>lifecycle-static-weaving-maven-plugin</artifactId>
-				<version>${lifecycle.version}</version>
-				<executions>
-					<execution>
-						<configuration>
-							<lifecyclePath>${user.home}/.m2/repository/net/madz/Lifecycle/${lifecycle.version}/Lifecycle-${lifecycle.version}.jar</lifecyclePath>
-						</configuration>
-						<phase>compile</phase>
-						<goals>
-							<goal>StaticWeave</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-		
-		</plugins>
-		
-	</build>
+1. define lifecycle.version and lifecycle.weaver.version
+<properties>
+    <java.version>1.8</java.version>
+    <lifecycle.version>0.9.13</lifecycle.version>
+    <lifecycle.weaver.version>0.9.2</lifecycle.weaver.version>
+</properties>
+
+2. add Lifecycle dependency
+<dependencies>
+    <dependency>
+        <groupId>net.imadz</groupId>
+        <artifactId>Lifecycle</artifactId>
+        <version>${lifecycle.version}</version>
+    </dependency>
+</dependencies>
+
+3. add lifecycle-static-weaving-maven-plugin plugin to weave code
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.5.1</version>
+            <configuration>
+                <source>${java.version}</source>
+                <target>${java.version}</target>
+            </configuration>
+        </plugin>
+        <plugin>
+            <groupId>net.imadz</groupId>
+            <artifactId>lifecycle-static-weaving-maven-plugin</artifactId>
+            <version>${lifecycle.weaver.version}</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>StaticWeave</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+
+4. run mvn clean package to package jar
